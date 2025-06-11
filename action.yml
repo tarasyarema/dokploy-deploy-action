@@ -27,25 +27,32 @@ runs:
         DOKPLOY_AUTH_TOKEN: ${{ inputs.auth_token }}
         DOKPLOY_APPLICATION_ID: ${{ inputs.application_id }}
         WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
+        SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
+
       run: |
-        echo "Triggering deployment for application ID: $DOKPLOY_APPLICATION_ID"
-        
-        response=$(curl -X 'POST' \
-          "$DOKPLOY_URL/api/application.redeploy" \
-          -H 'accept: application/json' \
-          -H 'Content-Type: application/json' \
-          -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-          -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
-          -w "%{http_code}" \
-          -o /dev/null \
-          -s)
-        
-        if [ "$response" -ne 200 ]; then
-          echo "Deployment failed with status code: $response"
-          exit 1
+        if [ "$SKIP_DEPLOY" = "true" ]; then
+          echo "Skipping deployment as per SKIP_DEPLOY flag"
+
+        else
+          echo "Triggering deployment for application ID: $DOKPLOY_APPLICATION_ID"
+          
+          response=$(curl -X 'POST' \
+            "$DOKPLOY_URL/api/application.redeploy" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -w "%{http_code}" \
+            -o /dev/null \
+            -s)
+          
+          if [ "$response" -ne 200 ]; then
+            echo "Deployment failed with status code: $response"
+            exit 1
+          fi
+          
+          echo "Deployment triggered successfully"
         fi
-        
-        echo "Deployment triggered successfully"
         
         # Wait for completion if requested
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
