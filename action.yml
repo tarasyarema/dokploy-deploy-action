@@ -37,6 +37,9 @@ runs:
           local initial_sleep=${3:-10}
           local status_field=${4:-"dep_status"}
 
+          echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
+          sleep $initial_sleep
+
           local elapsed=0
           
           while [ $elapsed -lt $timeout ]; do
@@ -51,9 +54,6 @@ runs:
               echo "Failed to fetch application status"
               exit 1
             fi
-
-            echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
-            sleep $initial_sleep
             
             # Extract the appropriate status field
             if [ "$status_field" = "dep_status" ]; then
@@ -130,10 +130,12 @@ runs:
         # Wait for completion if requested
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
           # Check deployment status
-          check_deployment_status 600 "deployment" 10 "dep_status"
+          # check_deployment_status 600 "deployment" 10 "dep_status"
+          check_deployment_status 600 "deployment" 10 "status"
           
           # Trigger reload after deployment completes
           echo "Triggering application reload..."
+
           reload_response=$(curl -X 'POST' \
             "$DOKPLOY_URL/api/application.reload" \
             -H 'accept: application/json' \
@@ -152,7 +154,7 @@ runs:
           echo "Application reload triggered successfully"
           
           # Check deployment status again after reload
-          check_deployment_status 600 "reload" 10 "status"
+          # check_deployment_status 600 "reload" 10 "status"
           
           echo "Deployment and reload finished successfully"
         fi
