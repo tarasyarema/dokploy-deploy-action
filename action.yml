@@ -34,7 +34,8 @@ runs:
         check_deployment_status() {
           local timeout=${1:-600}  # Default 10 minutes
           local operation_name=${2:-"deployment"}
-          local initial_sleep=${3:-30}
+          local initial_sleep=${3:-10}
+          local status_field=${4:-"dep_status"}
           
           echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
           sleep $initial_sleep
@@ -42,22 +43,30 @@ runs:
           local elapsed=0
           
           while [ $elapsed -lt $timeout ]; do
-            # Get deployment status
-            deployment_response=$(curl -X 'GET' \
-              "$DOKPLOY_URL/api/deployment.all?applicationId=$DOKPLOY_APPLICATION_ID" \
+            # Get application status
+            application_response=$(curl -X 'GET' \
+              "$DOKPLOY_URL/api/application.one?applicationId=$DOKPLOY_APPLICATION_ID" \
               -H 'accept: application/json' \
               -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
               -s)
             
             if [ $? -ne 0 ]; then
-              echo "Failed to fetch deployment status"
+              echo "Failed to fetch application status"
               exit 1
             fi
             
-            latest_status=$(echo "$deployment_response" | jq -r '.[0].status // "unknown"')
+            # Extract the appropriate status field
+            if [ "$status_field" = "dep_status" ]; then
+              latest_status=$(echo "$application_response" | jq -r '.deployments[0].status // "unknown"')
+            elif [ "$status_field" = "status" ]; then
+              latest_status=$(echo "$application_response" | jq -r '.applicationStatus // "unknown"')
+            else
+              echo "Unknown status field: $status_field"
+              exit 1
+            fi
             
             if [ "$latest_status" = "unknown" ] || [ "$latest_status" = "null" ]; then
-              echo "Could not determine deployment status"
+              echo "Could not determine $operation_name status"
               exit 1
             fi
             
@@ -121,7 +130,7 @@ runs:
         # Wait for completion if requested
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
           # Check deployment status
-          check_deployment_status 600 "deployment" 30
+          check_deployment_status 600 "deployment" 10 "dep_status"
           
           # Trigger reload after deployment completes
           echo "Triggering application reload..."
@@ -143,7 +152,7 @@ runs:
           echo "Application reload triggered successfully"
           
           # Check deployment status again after reload
-          check_deployment_status 600 "reload" 30
+          check_deployment_status 600 "reload" 10 "status"
           
           echo "Deployment and reload finished successfully"
         fi
