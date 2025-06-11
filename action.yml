@@ -36,9 +36,6 @@ runs:
           local operation_name=${2:-"deployment"}
           local initial_sleep=${3:-10}
           local status_field=${4:-"dep_status"}
-          
-          echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
-          sleep $initial_sleep
 
           local elapsed=0
           
@@ -54,6 +51,9 @@ runs:
               echo "Failed to fetch application status"
               exit 1
             fi
+
+            echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
+            sleep $initial_sleep
             
             # Extract the appropriate status field
             if [ "$status_field" = "dep_status" ]; then
