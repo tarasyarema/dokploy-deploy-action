@@ -88,22 +88,22 @@ runs:
               "done")
                 echo "Deployment completed successfully!"
 
-                reload_response=$(curl -X 'POST' \
-                  "$DOKPLOY_URL/api/application.reload" \
-                  -H 'accept: application/json' \
-                  -H 'Content-Type: application/json' \
-                  -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-                  -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
-                  -w "%{http_code}" \
-                  -o /dev/null \
-                  -s)
+                # reload_response=$(curl -X 'POST' \
+                #   "$DOKPLOY_URL/api/application.reload" \
+                #   -H 'accept: application/json' \
+                #   -H 'Content-Type: application/json' \
+                #   -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+                #   -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
+                #   -w "%{http_code}" \
+                #   -o /dev/null \
+                #   -s)
+                # 
+                # if [ "$reload_response" -ne 200 ]; then
+                #   echo "Reload failed with status code: $reload_response"
+                #   exit 1
+                # fi
                 
-                if [ "$reload_response" -ne 200 ]; then
-                  echo "Reload failed with status code: $reload_response"
-                  exit 1
-                fi
-                
-                echo "Deployment finished successfully with final reload"
+                echo "Deployment finished successfully"
                 exit 0
                 ;;
               "error")
