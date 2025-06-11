@@ -30,6 +30,79 @@ runs:
         SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
 
       run: |
+        # Function to check deployment status with timeout
+        check_deployment_status() {
+          local timeout=${1:-600}  # Default 10 minutes
+          local operation_name=${2:-"deployment"}
+          local initial_sleep=${3:-10}
+          local status_field=${4:-"dep_status"}
+          
+          echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
+          sleep $initial_sleep
+
+          local elapsed=0
+          
+          while [ $elapsed -lt $timeout ]; do
+            # Get application status
+            application_response=$(curl -X 'GET' \
+              "$DOKPLOY_URL/api/application.one?applicationId=$DOKPLOY_APPLICATION_ID" \
+              -H 'accept: application/json' \
+              -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+              -s)
+            
+            if [ $? -ne 0 ]; then
+              echo "Failed to fetch application status"
+              exit 1
+            fi
+            
+            # Extract the appropriate status field
+            if [ "$status_field" = "dep_status" ]; then
+              latest_status=$(echo "$application_response" | jq -r '.deployments[0].status // "unknown"')
+            elif [ "$status_field" = "status" ]; then
+              latest_status=$(echo "$application_response" | jq -r '.applicationStatus // "unknown"')
+            else
+              echo "Unknown status field: $status_field"
+              exit 1
+            fi
+            
+            if [ "$latest_status" = "unknown" ] || [ "$latest_status" = "null" ]; then
+              echo "Could not determine $operation_name status"
+              exit 1
+            fi
+            
+            echo "Current $operation_name status: $latest_status after $elapsed seconds"
+            
+            case "$latest_status" in
+              "done")
+                echo "$operation_name completed successfully!"
+                return 0
+                ;;
+              "error")
+                echo "$operation_name failed with error status"
+                exit 1
+                ;;
+              "idle")
+                echo "$operation_name idle, waiting..."
+                sleep 1
+                elapsed=$((elapsed + 1))
+                ;;
+              "running")
+                echo "$operation_name still running, waiting..."
+                sleep 1
+                elapsed=$((elapsed + 1))
+                ;;
+              *)
+                echo "Unknown $operation_name status: $latest_status"
+                sleep 1
+                elapsed=$((elapsed + 1))
+                ;;
+            esac
+          done
+          
+          echo "$operation_name timeout reached ($timeout seconds). Current status: $latest_status"
+          exit 1
+        }
+
         if [ "$SKIP_DEPLOY" = "true" ]; then
           echo "Skipping deployment as per SKIP_DEPLOY flag"
 
@@ -56,81 +129,30 @@ runs:
         
         # Wait for completion if requested
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
-          echo "Waiting for 30 seconds for deployment to complete..."
-          sleep 30
-
-          timeout=600  # 10 minutes in seconds
-          elapsed=0
+          # Check deployment status
+          check_deployment_status 600 "deployment" 10 "dep_status"
           
-          while [ $elapsed -lt $timeout ]; do
-            # Get deployment status
-            deployment_response=$(curl -X 'GET' \
-              "$DOKPLOY_URL/api/deployment.all?applicationId=$DOKPLOY_APPLICATION_ID" \
-              -H 'accept: application/json' \
-              -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-              -s)
-            
-            if [ $? -ne 0 ]; then
-              echo "Failed to fetch deployment status"
-              exit 1
-            fi
-            
-            latest_status=$(echo "$deployment_response" | jq -r '.[0].status // "unknown"')
-            
-            if [ "$latest_status" = "unknown" ] || [ "$latest_status" = "null" ]; then
-              echo "Could not determine deployment status"
-              exit 1
-            fi
-            
-            echo "Current deployment status: $latest_status after $elapsed seconds"
-            
-            case "$latest_status" in
-              "done")
-                echo "Deployment completed successfully!"
+          # Trigger reload after deployment completes
+          echo "Triggering application reload..."
+          reload_response=$(curl -X 'POST' \
+            "$DOKPLOY_URL/api/application.reload" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -w "%{http_code}" \
+            -o /dev/null \
+            -s)
 
-                reload_response=$(curl -X 'POST' \
-                  "$DOKPLOY_URL/api/application.reload" \
-                  -H 'accept: application/json' \
-                  -H 'Content-Type: application/json' \
-                  -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-                  -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
-                  -w "%{http_code}" \
-                  -o /dev/null \
-                  -s)
+          if [ "$reload_response" -ne 200 ]; then
+            echo "Reload failed with status code: $reload_response"
+            exit 1
+          fi
 
-                if [ "$reload_response" -ne 200 ]; then
-                  echo "Reload failed with status code: $reload_response"
-                  exit 1
-                fi
-
-                echo "Application reloaded successfully, waiting 30 seconds before finishing..."
-                sleep 30
-
-                echo "Deployment finished successfully"
-                exit 0
-                ;;
-              "error")
-                echo "Deployment failed with error status"
-                exit 1
-                ;;
-              "idle")
-                echo "Deployment idle, waiting..."
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-              "running")
-                echo "Deployment still running, waiting..."
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-              *)
-                echo "Unknown deployment status: $latest_status"
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-            esac
-          done
+          echo "Application reload triggered successfully"
           
-          echo "Deployment timeout reached (10 minutes). Current status: $latest_status"
-          exit 1
+          # Check deployment status again after reload
+          check_deployment_status 600 "reload" 10 "status"
+          
+          echo "Deployment and reload finished successfully"
         fi
