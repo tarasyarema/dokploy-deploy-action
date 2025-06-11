@@ -56,8 +56,9 @@ runs:
         
         # Wait for completion if requested
         if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
-          echo "Waiting for deployment to complete..."
-          
+          echo "Waiting for 30 seconds for deployment to complete..."
+          sleep 30
+
           timeout=600  # 10 minutes in seconds
           elapsed=0
           
@@ -74,7 +75,6 @@ runs:
               exit 1
             fi
             
-            # Extract the latest deployment status using jq
             latest_status=$(echo "$deployment_response" | jq -r '.[0].status // "unknown"')
             
             if [ "$latest_status" = "unknown" ] || [ "$latest_status" = "null" ]; then
@@ -82,7 +82,7 @@ runs:
               exit 1
             fi
             
-            echo "Current deployment status: $latest_status"
+            echo "Current deployment status: $latest_status after $elapsed seconds"
             
             case "$latest_status" in
               "done")
@@ -103,8 +103,8 @@ runs:
                   exit 1
                 fi
 
-                echo "Application reloaded successfully, waiting for 10 seconds before finishing"
-                sleep 10
+                echo "Application reloaded successfully, waiting 30 seconds before finishing..."
+                sleep 30
 
                 echo "Deployment finished successfully"
                 exit 0
@@ -112,6 +112,11 @@ runs:
               "error")
                 echo "Deployment failed with error status"
                 exit 1
+                ;;
+              "idle")
+                echo "Deployment idle, waiting..."
+                sleep 1
+                elapsed=$((elapsed + 1))
                 ;;
               "running")
                 echo "Deployment still running, waiting..."
