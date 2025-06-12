@@ -13,6 +13,9 @@ inputs:
   application_id:
     description: 'Dokploy application ID'
     required: true
+  application_name:
+    description: 'Dokploy application name'
+    required: true
   wait_for_completion:
     description: 'Wait for deployment to finish (default: false)'
     required: false
@@ -26,6 +29,7 @@ runs:
         DOKPLOY_URL: ${{ inputs.dokploy_url }}
         DOKPLOY_AUTH_TOKEN: ${{ inputs.auth_token }}
         DOKPLOY_APPLICATION_ID: ${{ inputs.application_id }}
+        DOKPLOY_APPLICATION_NAME: ${{ inputs.application_name }}
         WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
         SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
 
@@ -107,7 +111,7 @@ runs:
           echo "Skipping deployment as per SKIP_DEPLOY flag"
 
         else
-          echo "Triggering deployment for application ID: $DOKPLOY_APPLICATION_ID"
+          echo "Triggering deployment for application ID: $DOKPLOY_APPLICATION_ID ($DOKPLOY_APPLICATION_NAME)"
           
           response=$(curl -X 'POST' \
             "$DOKPLOY_URL/api/application.deploy" \
@@ -141,7 +145,7 @@ runs:
             -H 'accept: application/json' \
             -H 'Content-Type: application/json' \
             -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_NAME\"}" \
             -w "%{http_code}" \
             -o /dev/null \
             -s)
