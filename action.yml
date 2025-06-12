@@ -134,27 +134,27 @@ runs:
           check_deployment_status 600 "deployment" 30 "status"
           
           # Trigger reload after deployment completes
-          # echo "Triggering application reload..."
-          #
-          # reload_response=$(curl -X 'POST' \
-          #   "$DOKPLOY_URL/api/application.reload" \
-          #   -H 'accept: application/json' \
-          #   -H 'Content-Type: application/json' \
-          #   -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-          #   -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
-          #   -w "%{http_code}" \
-          #   -o /dev/null \
-          #   -s)
-          #
-          # if [ "$reload_response" -ne 200 ]; then
-          #   echo "Reload failed with status code: $reload_response"
-          #   exit 1
-          # fi
-          #
-          # echo "Application reload triggered successfully"
+          echo "Triggering application reload..."
+
+          reload_response=$(curl -X 'POST' \
+            "$DOKPLOY_URL/api/application.reload" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -w "%{http_code}" \
+            -o /dev/null \
+            -s)
+
+          if [ "$reload_response" -ne 200 ]; then
+            echo "Reload failed with status code: $reload_response"
+            exit 1
+          fi
+
+          echo "Application reload triggered successfully"
           
           # Check deployment status again after reload
-          # check_deployment_status 600 "reload" 60 "status"
+          check_deployment_status 600 "reload" 10 "status"
           
           echo "Deployment and reload finished successfully"
         fi
