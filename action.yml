@@ -31,6 +31,7 @@ runs:
         DOKPLOY_APPLICATION_ID: ${{ inputs.application_id }}
         DOKPLOY_APPLICATION_NAME: ${{ inputs.application_name }}
         WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
+        RESTART: ${{ inputs.restart || 'false' }}
         SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
 
       run: |
@@ -161,4 +162,44 @@ runs:
 
             echo "Deployment and reload finished successfully"
           fi
+        fi
+
+        # Start and stop the application if requested
+        if [ "$RESTART" = "true" ]; then
+          # Optionally stop the application after starting
+          echo "Stopping application..."
+          
+          stop_response=$(curl -X 'POST' \
+            "$DOKPLOY_URL/api/application.stop" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -w "%{http_code}" \
+            -o /dev/null \
+            -s)
+
+          if [ "$stop_response" -ne 200 ]; then
+            echo "Stop failed with status code: $stop_response"
+            exit 1
+          fi
+
+          echo "Application stopped successfully, starting it again..."
+
+          start_response=$(curl -X 'POST' \
+            "$DOKPLOY_URL/api/application.start" \
+            -H 'accept: application/json' \
+            -H 'Content-Type: application/json' \
+            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
+            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
+            -w "%{http_code}" \
+            -o /dev/null \
+            -s)
+
+          if [ "$start_response" -ne 200 ]; then
+            echo "Start failed with status code: $start_response"
+            exit 1
+          fi
+
+          echo "Application started successfully"
         fi

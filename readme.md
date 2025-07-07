@@ -22,6 +22,11 @@ e.g. `https://server.example.com`
 
 **Optional** Wait for the deployment to finish before completing the action. When set to `true`, the action will poll the deployment status every second for up to 10 minutes. If the deployment fails, the action will exit with an error. Default: `false`.
 
+
+### `restart`
+
+**Optional** Restart the Dokploy application after deployment. When set to `true`, the action will trigger a restart of the application after the deployment is complete. Default: `false`.
+
 ## Usage
 
 To use this action, include it in your workflow file as follows:
@@ -58,6 +63,21 @@ To wait for the deployment to finish:
         application_id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
         dokploy_url: ${{ secrets.DOKPLOY_URL }}
         wait_for_completion: true
+```
+
+### With restart
+
+To restart the application after deployment:
+
+```yaml
+    - name: Dokploy Deployment
+      uses: benbristow/dokploy-deploy-action@0.0.1
+      with:
+        auth_token: ${{ secrets.DOKPLOY_AUTH_TOKEN }}
+        application_id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
+        dokploy_url: ${{ secrets.DOKPLOY_URL }}
+        wait_for_completion: false
+        restart: true
 ```
 
 ## Contributing
