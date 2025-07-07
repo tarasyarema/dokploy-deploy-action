@@ -20,6 +20,10 @@ inputs:
     description: 'Wait for deployment to finish (default: false)'
     required: false
     default: 'false'
+  restart:
+    description: 'Restart application after deployment (default: false)'
+    required: false
+    default: 'false'
 runs:
   using: "composite"
   steps:
