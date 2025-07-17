@@ -205,5 +205,7 @@ runs:
             exit 1
           fi
 
+          check_deployment_status 600 "restart" 10 "status"
+
           echo "Application started successfully"
         fi
