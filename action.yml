@@ -24,188 +24,40 @@ inputs:
     description: 'Restart application after deployment (default: false)'
     required: false
     default: 'false'
+  debug:
+    description: 'Enable debug logging (default: false)'
+    required: false
+    default: 'false'
+  skip_deploy:
+    description: 'Skip deployment trigger (for testing, default: false)'
+    required: false
+    default: 'false'
 runs:
   using: "composite"
   steps:
-    - name: Trigger Dokploy deployment
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        cache-dependency-path: ${{ github.action_path }}/requirements.txt
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        pip install -q -r ${{ github.action_path }}/requirements.txt
+
+    - name: Run Dokploy deployment
       shell: bash
       env:
-        DOKPLOY_URL: ${{ inputs.dokploy_url }}
-        DOKPLOY_AUTH_TOKEN: ${{ inputs.auth_token }}
-        DOKPLOY_APPLICATION_ID: ${{ inputs.application_id }}
-        DOKPLOY_APPLICATION_NAME: ${{ inputs.application_name }}
-        WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
-        RESTART: ${{ inputs.restart || 'false' }}
-        SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
-
+        INPUT_DOKPLOY_URL: ${{ inputs.dokploy_url }}
+        INPUT_AUTH_TOKEN: ${{ inputs.auth_token }}
+        INPUT_APPLICATION_ID: ${{ inputs.application_id }}
+        INPUT_APPLICATION_NAME: ${{ inputs.application_name }}
+        INPUT_WAIT_FOR_COMPLETION: ${{ inputs.wait_for_completion }}
+        INPUT_RESTART: ${{ inputs.restart || 'false' }}
+        INPUT_SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
+        INPUT_DEBUG: ${{ inputs.debug || 'false' }}
+        PYTHONPATH: ${{ github.action_path }}/src
       run: |
-        # Function to check deployment status with timeout
-        check_deployment_status() {
-          local timeout=${1:-600}  # Default 10 minutes
-          local operation_name=${2:-"deployment"}
-          local initial_sleep=${3:-10}
-          local status_field=${4:-"dep_status"}
-
-          echo "Waiting for $initial_sleep seconds for $operation_name to complete..."
-          sleep $initial_sleep
-
-          local elapsed=0
-          
-          while [ $elapsed -lt $timeout ]; do
-            # Get application status
-            application_response=$(curl -X 'GET' \
-              "$DOKPLOY_URL/api/application.one?applicationId=$DOKPLOY_APPLICATION_ID" \
-              -H 'accept: application/json' \
-              -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-              -s)
-            
-            if [ $? -ne 0 ]; then
-              echo "Failed to fetch application status"
-              exit 1
-            fi
-            
-            # Extract the appropriate status field
-            if [ "$status_field" = "dep_status" ]; then
-              latest_status=$(echo "$application_response" | jq -r '.deployments[-1].status // "unknown"')
-            elif [ "$status_field" = "status" ]; then
-              latest_status=$(echo "$application_response" | jq -r '.applicationStatus // "unknown"')
-            else
-              echo "Unknown status field: $status_field"
-              exit 1
-            fi
-            
-            if [ "$latest_status" = "unknown" ] || [ "$latest_status" = "null" ]; then
-              echo "Could not determine $operation_name status"
-              exit 1
-            fi
-            
-            echo "Current $operation_name status: $latest_status after $elapsed seconds"
-            
-            case "$latest_status" in
-              "done")
-                echo "$operation_name completed successfully!"
-                return 0
-                ;;
-              "error")
-                echo "$operation_name failed with error status"
-                exit 1
-                ;;
-              "idle")
-                echo "$operation_name idle, waiting..."
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-              "running")
-                echo "$operation_name still running, waiting..."
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-              *)
-                echo "Unknown $operation_name status: $latest_status"
-                sleep 1
-                elapsed=$((elapsed + 1))
-                ;;
-            esac
-          done
-          
-          echo "$operation_name timeout reached ($timeout seconds). Current status: $latest_status"
-          exit 1
-        }
-
-        if [ "$SKIP_DEPLOY" = "true" ]; then
-          echo "Skipping deployment as per SKIP_DEPLOY flag"
-
-        else
-          echo "Triggering deployment for application ID: $DOKPLOY_APPLICATION_ID ($DOKPLOY_APPLICATION_NAME)"
-          
-          response=$(curl -X 'POST' \
-            "$DOKPLOY_URL/api/application.deploy" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
-            -w "%{http_code}" \
-            -o /dev/null \
-            -s)
-          
-          if [ "$response" -ne 200 ]; then
-            echo "Deployment failed with status code: $response"
-            exit 1
-          fi
-          
-          echo "Deployment triggered successfully"
-        fi
-        
-        # Wait for completion if requested
-        if [ "$WAIT_FOR_COMPLETION" = "true" ]; then
-          # Check deployment status
-          # check_deployment_status 600 "deployment" 10 "dep_status"
-          check_deployment_status 600 "deployment" 60 "status"
-          
-          # Trigger reload after deployment completes
-          echo "Triggering application reload..."
-
-          reload_response=$(curl -X 'POST' \
-            "$DOKPLOY_URL/api/application.reload" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\", \"appName\": \"$DOKPLOY_APPLICATION_NAME\"}" \
-            -w "%{http_code}" \
-            -o /dev/null \
-            -s)
-
-          if [ "$reload_response" -ne 200 ]; then
-            echo "Reload failed with status code: $reload_response"
-
-          else
-            echo "Application reload triggered successfully"
-
-            # Check deployment status again after reload
-            check_deployment_status 600 "reload" 10 "status"
-
-            echo "Deployment and reload finished successfully"
-          fi
-        fi
-
-        # Start and stop the application if requested
-        if [ "$RESTART" = "true" ]; then
-          # Optionally stop the application after starting
-          echo "Stopping application..."
-          
-          stop_response=$(curl -X 'POST' \
-            "$DOKPLOY_URL/api/application.stop" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
-            -w "%{http_code}" \
-            -o /dev/null \
-            -s)
-
-          if [ "$stop_response" -ne 200 ]; then
-            echo "Stop failed with status code: $stop_response"
-            exit 1
-          fi
-
-          echo "Application stopped successfully, starting it again..."
-
-          start_response=$(curl -X 'POST' \
-            "$DOKPLOY_URL/api/application.start" \
-            -H 'accept: application/json' \
-            -H 'Content-Type: application/json' \
-            -H "x-api-key: $DOKPLOY_AUTH_TOKEN" \
-            -d "{\"applicationId\": \"$DOKPLOY_APPLICATION_ID\"}" \
-            -w "%{http_code}" \
-            -o /dev/null \
-            -s)
-
-          if [ "$start_response" -ne 200 ]; then
-            echo "Start failed with status code: $start_response"
-            exit 1
-          fi
-
-          check_deployment_status 600 "restart" 10 "status"
-
-          echo "Application started successfully"
-        fi
+        python3 ${{ github.action_path }}/src/deploy.py

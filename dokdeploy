@@ -1,0 +1,37 @@
+#!/usr/bin/env python3
+"""
+dokdeploy - Deploy applications to Dokploy from the command line
+
+Usage:
+    dokdeploy init                    # Initialize config file
+    dokdeploy list                    # List configured apps
+    dokdeploy deploy app1 app2        # Deploy specific apps
+    dokdeploy deploy --all            # Deploy all apps
+    dokdeploy status app1             # Show app status
+    dokdeploy history app1            # Show deployment history
+    dokdeploy config show             # Show configuration
+    dokdeploy config validate         # Validate configuration
+
+For more help: dokdeploy --help
+"""
+
+import sys
+import os
+from pathlib import Path
+
+# Add src directory to Python path
+src_dir = Path(__file__).parent / 'src'
+sys.path.insert(0, str(src_dir))
+
+# Import and run CLI
+try:
+    from cli import main
+    sys.exit(main())
+except ImportError as e:
+    print(f"Error: Failed to import CLI module: {e}", file=sys.stderr)
+    print(f"Make sure you're in the correct directory and dependencies are installed.", file=sys.stderr)
+    print(f"Run: uv pip install -r requirements.txt", file=sys.stderr)
+    sys.exit(1)
+except KeyboardInterrupt:
+    print("\n\nCancelled by user", file=sys.stderr)
+    sys.exit(130)

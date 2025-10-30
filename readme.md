@@ -1,89 +1,376 @@
-# Dokploy Deployment GitHub Action
+# Dokploy Deployment Tool
 
-This GitHub Action triggers a deployment on Dokploy.
+Deploy applications to Dokploy from **GitHub Actions** or the **command line**.
+
+This tool:
+- 🎯 **GitHub Action** - Automated deployments in your CI/CD pipeline
+- 💻 **CLI Tool (`dokdeploy`)** - Deploy from your local machine
+- ✅ **Proper verification** - Ensures deployments actually complete (no more race conditions!)
+
+## What's New (v2.0)
+
+This action has been completely rewritten in Python to fix critical race conditions that caused deployments to appear successful while the old version kept running. Key improvements:
+
+- **Deployment tracking by ID**: Tracks the specific deployment triggered, not just application status
+- **Race condition fixes**: Detects when deployment hasn't started yet (instant "done" bug)
+- **Smart polling**: Exponential backoff and state transition detection
+- **Better error messages**: Clear explanations when things go wrong
+- **Debug mode**: See full API requests/responses for troubleshooting
 
 ## Inputs
 
+### `dokploy_url`
+
+**Required** Dokploy dashboard URL (this should have the Dokploy API accessible at /api) - no trailing slash.
+
+Example: `https://server.example.com` or `https://app.dokploy.com`
+
 ### `auth_token`
 
-**Required** The Dokploy authentication token.
+**Required** The Dokploy authentication token (API key).
 
 ### `application_id`
 
 **Required** The Dokploy application ID.
 
-### `dokploy_url`
+### `application_name`
 
-**Required** Dokploy dashboard URL (this should have the Dokploy API accessible at /api) - no trailing backslash.
-
-e.g. `https://server.example.com`
+**Required** The Dokploy application name.
 
 ### `wait_for_completion`
 
-**Optional** Wait for the deployment to finish before completing the action. When set to `true`, the action will poll the deployment status every second for up to 10 minutes. If the deployment fails, the action will exit with an error. Default: `false`.
+**Optional** Wait for the deployment to finish before completing the action. Default: `false`.
 
+When `true`:
+- Polls deployment status every 3-20 seconds with smart backoff
+- Verifies the triggered deployment actually started and completed
+- Fails if deployment errors, is cancelled, or times out
+- Timeout: 10 minutes (suitable for source builds)
+
+**⚠️ Recommended: Set to `true`** to ensure deployments succeed before continuing your workflow (e.g., running tests).
 
 ### `restart`
 
-**Optional** Restart the Dokploy application after deployment. When set to `true`, the action will trigger a restart of the application after the deployment is complete. Default: `false`.
+**Optional** Restart the Dokploy application after deployment completes. Default: `false`.
+
+When `true`:
+- Only executes if deployment verification succeeds
+- Stops the application, waits 5 seconds, then starts it
+- Verifies application is running after restart
+
+**Note**: Only needed if Dokploy doesn't automatically restart after deployment.
+
+### `debug`
+
+**Optional** Enable debug logging to see full API requests and responses. Default: `false`.
+
+Useful for troubleshooting deployment issues.
 
 ## Usage
 
-To use this action, include it in your workflow file as follows:
+### Basic Usage (Fire and Forget)
+
+Triggers deployment without waiting for completion:
 
 ```yaml
-name: Dokploy Deployment Workflow
+name: Deploy to Dokploy
 
-on: [push]
+on:
+  push:
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Dokploy Deployment
-      uses: benbristow/dokploy-deploy-action@0.0.1
-      with:
-        auth_token: ${{ secrets.DOKPLOY_AUTH_TOKEN }}
-        application_id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
-        dokploy_url: ${{ secrets.DOKPLOY_URL }}
+      - name: Trigger Dokploy deployment
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: ${{ secrets.DOKPLOY_APP_ID }}
+          application_name: my-app
 ```
 
-### With wait for completion
+**⚠️ Warning**: Without `wait_for_completion: true`, the action exits immediately and **doesn't verify** the deployment succeeded. The old version might keep running.
 
-To wait for the deployment to finish:
+### Recommended Usage (With Verification)
+
+Wait for deployment to complete before continuing:
 
 ```yaml
-    - name: Dokploy Deployment
-      uses: benbristow/dokploy-deploy-action@0.0.1
-      with:
-        auth_token: ${{ secrets.DOKPLOY_AUTH_TOKEN }}
-        application_id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
-        dokploy_url: ${{ secrets.DOKPLOY_URL }}
-        wait_for_completion: true
+      - name: Deploy to Dokploy
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: https://app.dokploy.com
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: abc123
+          application_name: my-app
+          wait_for_completion: true
 ```
 
-### With restart
+This ensures:
+- Deployment actually starts and completes
+- Errors are caught and fail the workflow
+- Next steps run against the new version
 
-To restart the application after deployment:
+### With Restart (Force New Version)
+
+For apps that need explicit restart:
 
 ```yaml
-    - name: Dokploy Deployment
-      uses: benbristow/dokploy-deploy-action@0.0.1
-      with:
-        auth_token: ${{ secrets.DOKPLOY_AUTH_TOKEN }}
-        application_id: ${{ secrets.DOKPLOY_APPLICATION_ID }}
-        dokploy_url: ${{ secrets.DOKPLOY_URL }}
-        wait_for_completion: false
-        restart: true
+      - name: Deploy and restart
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: ${{ secrets.DOKPLOY_APP_ID }}
+          application_name: my-app
+          wait_for_completion: true
+          restart: true
 ```
+
+### Multiple Applications (Matrix Strategy)
+
+Deploy multiple apps in parallel:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app:
+          - { id: 'abc123', name: 'api' }
+          - { id: 'def456', name: 'worker-1' }
+          - { id: 'ghi789', name: 'worker-2' }
+    steps:
+      - name: Deploy ${{ matrix.app.name }}
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: https://app.dokploy.com
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: ${{ matrix.app.id }}
+          application_name: ${{ matrix.app.name }}
+          wait_for_completion: true
+          restart: true
+```
+
+### With E2E Tests After Deployment
+
+Ensure tests run against the new version:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy application
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: ${{ secrets.DOKPLOY_APP_ID }}
+          application_name: my-app
+          wait_for_completion: true  # Critical: wait before testing!
+
+  test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E tests
+        run: npm run test:e2e
+```
+
+### Debug Mode
+
+Enable detailed logging to troubleshoot issues:
+
+```yaml
+      - name: Deploy (with debug)
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          application_id: ${{ secrets.DOKPLOY_APP_ID }}
+          application_name: my-app
+          wait_for_completion: true
+          debug: true
+```
+
+## How It Works
+
+The action fixes the race condition bug by:
+
+1. **Capturing baseline**: Gets the timestamp of the latest deployment before triggering
+2. **Triggering deployment**: Calls Dokploy API to start deployment
+3. **Finding the new deployment**: Polls `/api/deployment.all` for a deployment created after baseline
+4. **Tracking by ID**: Monitors that specific deployment's status until completion
+5. **Verifying completion**: Ensures deployment actually entered "running" state before "done"
+
+This prevents the bug where the action would check `applicationStatus` (already "done" from previous deployment) instead of tracking the triggered deployment.
+
+## Troubleshooting
+
+### "Deployment marked 'done' after only Xs without entering 'running' state"
+
+This warning indicates a potential race condition. The deployment might not have started yet, or completed extremely quickly. If you see this consistently, enable `debug: true` to see detailed API responses.
+
+### "No new deployment appeared within 30 seconds"
+
+The deployment trigger succeeded but no deployment was created. Possible causes:
+- Application ID is incorrect
+- Dokploy is experiencing issues
+- Deployment is queued but hasn't started
+
+Check the Dokploy dashboard manually.
+
+### "Deployment stuck in 'idle' state"
+
+The deployment is queued behind other deployments. This is normal for busy Dokploy instances. The action will continue waiting up to the timeout (10 minutes).
+
+### Enable Debug Logging
+
+Set `debug: true` to see:
+- Full API request URLs and bodies
+- Complete API responses
+- Detailed state transitions
+
+```yaml
+with:
+  debug: true
+```
+
+---
+
+# CLI Tool: Deploy from Your Machine
+
+The `dokdeploy` CLI lets you deploy directly to Dokploy from your local machine or any CI system.
+
+## Quick Start
+
+```bash
+# 1. Install dependencies
+uv sync
+
+# 2. Initialize config file
+uv run ./dokdeploy init
+
+# 3. Edit ~/.dokploy/deploy.yaml with your apps
+vim ~/.dokploy/deploy.yaml
+
+# 4. Deploy!
+uv run ./dokdeploy deploy api
+uv run ./dokdeploy deploy --all
+```
+
+## Example Config
+
+`~/.dokploy/deploy.yaml`:
+```yaml
+dokploy:
+  url: https://app.dokploy.com
+  auth_token: $DOKPLOY_AUTH_TOKEN
+
+defaults:
+  wait_for_completion: true
+  restart: false
+
+apps:
+  api:
+    id: 7YIYBwVKk_V3lUJKp37Va
+    name: qaforme-api-gp9he8
+
+  worker:
+    id: rfDCKRDJMlfCxX_nZ2qIq
+    name: qaforme-worker-wwmm7o
+```
+
+## CLI Commands
+
+```bash
+# List configured apps
+uv run ./dokdeploy list
+
+# Deploy one or more apps
+uv run ./dokdeploy deploy api
+uv run ./dokdeploy deploy api worker frontend
+
+# Deploy all apps (like your GitHub matrix!)
+uv run ./dokdeploy deploy --all
+
+# Check status
+uv run ./dokdeploy status api
+
+# View deployment history
+uv run ./dokdeploy history api
+
+# Validate config
+uv run ./dokdeploy config validate
+```
+
+**See [DEVELOPMENT.md](DEVELOPMENT.md) for complete CLI documentation.**
+
+---
+
+# Testing Locally
+
+You can test the deployment script locally without GitHub Actions.
+
+**Quick start:**
+```bash
+# Install uv (fast Python package manager)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
+
+# Copy template and add your credentials
+cp test_local.sh.template test_local.sh
+# Edit test_local.sh with your Dokploy credentials
+
+# Run it
+./test_local.sh
+```
+
+**See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed local development guide.**
+
+### Testing with a Different Branch
+
+To test changes from a branch in your workflow:
+
+```yaml
+- uses: tarasyarema/dokploy-deploy-action@your-branch-name
+```
+
+Or reference your fork:
+
+```yaml
+- uses: your-username/dokploy-deploy-action@main
+```
+
+## What Was Fixed
+
+**Before (v1.x - Bash version):**
+- ❌ Checked `applicationStatus` (wrong field, race condition)
+- ❌ 60-second initial wait (too long, missed state changes)
+- ❌ No deployment ID tracking
+- ❌ Instant "done" accepted as success
+- ❌ Reload called without coordination
+- ❌ Restart could start old version
+
+**After (v2.0 - Python version):**
+- ✅ Tracks specific deployment by ID
+- ✅ 3-second initial poll (catches deployment quickly)
+- ✅ Detects race conditions (instant "done" warning)
+- ✅ Smart polling with exponential backoff
+- ✅ Restart only after verified deployment
+- ✅ Debug mode for troubleshooting
+- ✅ Clear error messages
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue for any bugs or feature requests.
-
 
 ## License
 

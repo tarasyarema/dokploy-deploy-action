@@ -1,0 +1,55 @@
+# Dokploy Deployment Configuration
+# Copy this file to ~/.dokploy/deploy.yaml and customize for your setup
+#
+# Quick start:
+#   1. cp deploy.yaml.template ~/.dokploy/deploy.yaml
+#   2. Edit ~/.dokploy/deploy.yaml with your settings
+#   3. Run: dokdeploy list
+
+dokploy:
+  # Your Dokploy instance URL (no trailing slash)
+  # Example: https://app.dokploy.com or https://dokploy.mycompany.com
+  url: https://app.dokploy.com
+
+  # API token from Dokploy dashboard → Settings → API Tokens
+  # Can be:
+  #   - Literal value: "abc123xyz789"
+  #   - Environment variable: $DOKPLOY_AUTH_TOKEN
+  #   - Environment variable with default: ${DOKPLOY_AUTH_TOKEN:-default_value}
+  auth_token: $DOKPLOY_AUTH_TOKEN
+
+# Default settings applied to all apps (can be overridden per-app)
+defaults:
+  # Wait for deployment to complete before returning
+  wait_for_completion: true
+
+  # Restart application after successful deployment
+  # Usually not needed - Dokploy restarts automatically after builds
+  restart: false
+
+  # Enable debug logging (shows API requests/responses)
+  debug: false
+
+# Your applications
+# Add all the apps you want to deploy from the CLI
+apps:
+  # Example: API application
+  api:
+    id: your-app-id-here           # Get from Dokploy dashboard (in URL or settings)
+    name: your-app-name-here        # Application name as shown in Dokploy
+
+  # Example: Worker with custom settings
+  # worker:
+  #   id: worker-app-id
+  #   name: my-worker
+  #   wait_for_completion: true      # Override default
+  #   restart: true                   # Force restart after deployment
+
+  # Example: Frontend app (quick deploy, no wait)
+  # frontend:
+  #   id: frontend-app-id
+  #   name: my-frontend
+  #   wait_for_completion: false     # Fire and forget
+
+  # Add your apps here...
+  # You can copy app IDs from your GitHub workflow or Dokploy dashboard

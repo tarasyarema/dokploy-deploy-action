@@ -1,0 +1,5 @@
+# Dokploy Deploy Action Dependencies
+# Minimal dependencies for GitHub Actions environment and CLI tool
+
+requests>=2.31.0
+pyyaml>=6.0.0

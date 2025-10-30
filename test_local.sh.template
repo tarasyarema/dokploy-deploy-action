@@ -1,0 +1,34 @@
+#!/bin/bash
+#
+# Local testing script for Dokploy Deploy Action
+# Copy this to test_local.sh and fill in your credentials
+# (test_local.sh is in .gitignore so it won't be committed)
+#
+
+# Dokploy Configuration
+export INPUT_DOKPLOY_URL="https://app.dokploy.com"  # Your Dokploy URL
+export INPUT_AUTH_TOKEN="YOUR_API_TOKEN_HERE"       # Get from Dokploy Settings → API Tokens
+export INPUT_APPLICATION_ID="YOUR_APP_ID_HERE"      # Find in app URL or settings
+export INPUT_APPLICATION_NAME="YOUR_APP_NAME_HERE"  # Your app name
+
+# Action Configuration
+export INPUT_WAIT_FOR_COMPLETION="true"   # Wait for deployment to finish
+export INPUT_RESTART="false"              # Restart after deployment
+export INPUT_SKIP_DEPLOY="false"          # Skip deployment (test restart only)
+export INPUT_DEBUG="true"                 # Enable debug logging
+
+# Run the deployment script
+cd "$(dirname "$0")/src"
+python3 deploy.py
+
+# Check exit code
+exit_code=$?
+if [ $exit_code -eq 0 ]; then
+  echo ""
+  echo "✅ Deployment completed successfully"
+else
+  echo ""
+  echo "❌ Deployment failed with exit code: $exit_code"
+fi
+
+exit $exit_code
