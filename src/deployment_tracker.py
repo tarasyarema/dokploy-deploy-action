@@ -92,7 +92,7 @@ class DeploymentTracker:
         self,
         application_id: str,
         baseline_timestamp: Optional[str],
-        timeout: int = 30
+        timeout: int = 90
     ) -> Dict[str, Any]:
         """
         Wait for a new deployment to appear after triggering.
@@ -103,7 +103,7 @@ class DeploymentTracker:
         Args:
             application_id: Application ID
             baseline_timestamp: Timestamp of latest deployment before trigger
-            timeout: Max seconds to wait for deployment to appear
+            timeout: Max seconds to wait for deployment to appear (default 90s)
 
         Returns:
             The new deployment object
@@ -112,31 +112,64 @@ class DeploymentTracker:
             DeploymentNotFoundError: If no new deployment appears within timeout
         """
         self.logger.info("Waiting for deployment to be created...")
+        self.logger.debug(f"Baseline timestamp: {baseline_timestamp}")
 
         start_time = time.time()
-        poll_interval = 2  # Start with 2 second polls
+        poll_interval = 3  # Start with 3 second polls
+        last_check_time = 0
 
         while time.time() - start_time < timeout:
+            elapsed = int(time.time() - start_time)
+
             deployments = self.client.get_deployments(application_id)
+
+            # Debug: show latest deployment on first check and every 15s
+            if elapsed - last_check_time >= 15 or last_check_time == 0:
+                if deployments:
+                    latest = deployments[0]
+                    self.logger.debug(
+                        f"[{elapsed}s] Latest deployment in API: {latest['deploymentId']} "
+                        f"(created: {latest.get('createdAt')}, status: {latest.get('status')})"
+                    )
+                else:
+                    self.logger.debug(f"[{elapsed}s] No deployments found in API")
+                last_check_time = elapsed
+
             new_deployment = self._find_deployment_after(deployments, baseline_timestamp)
 
             if new_deployment:
                 deployment_id = new_deployment['deploymentId']
-                elapsed = int(time.time() - start_time)
                 self.logger.info(
-                    f"Found new deployment: {deployment_id} (detected after {elapsed}s)"
+                    f"✓ Found new deployment: {deployment_id} (detected after {elapsed}s)"
                 )
                 return new_deployment
 
-            self.logger.debug(f"No new deployment yet, waiting {poll_interval}s...")
+            self.logger.debug(f"[{elapsed}s] No new deployment yet, waiting {poll_interval}s...")
             time.sleep(poll_interval)
 
-        # Timeout
-        raise DeploymentNotFoundError(
+        # Timeout - provide more context
+        elapsed = int(time.time() - start_time)
+        error_msg = (
             f"No new deployment appeared within {timeout} seconds. "
-            "The deployment might have been queued but not started yet, "
-            "or the API call failed silently."
+            f"Baseline: {baseline_timestamp or 'none'}"
         )
+
+        if deployments:
+            latest = deployments[0]
+            error_msg += (
+                f"\n  Latest deployment in API: {latest['deploymentId']} "
+                f"(created: {latest.get('createdAt')})"
+            )
+
+        error_msg += (
+            "\n\nPossible causes:"
+            "\n  1. Deployment is queued and taking longer than expected"
+            "\n  2. Dokploy is under heavy load"
+            "\n  3. Application ID might be incorrect"
+            "\n  4. Clock skew between systems"
+        )
+
+        raise DeploymentNotFoundError(error_msg)
 
     def wait_for_completion(
         self,
@@ -274,8 +307,8 @@ class DeploymentTracker:
         Complete deployment tracking: wait for creation, then wait for completion.
 
         This is the main entry point that combines both phases of tracking:
-        1. Wait for the new deployment to appear in the API
-        2. Track that deployment to completion
+        1. Wait for the new deployment to appear in the API (up to 90s)
+        2. Track that deployment to completion (remaining timeout)
 
         Args:
             application_id: Application ID
@@ -290,18 +323,19 @@ class DeploymentTracker:
             DeploymentFailedError: If deployment fails
             DeploymentTimeoutError: If deployment times out
         """
-        # Phase 1: Wait for deployment to be created (max 30s)
+        # Phase 1: Wait for deployment to be created (max 90s for queued deployments)
         new_deployment = self.wait_for_new_deployment(
             application_id,
             baseline_timestamp,
-            timeout=30
+            timeout=90
         )
 
         deployment_id = new_deployment['deploymentId']
 
         # Phase 2: Wait for completion (remaining timeout)
+        remaining_timeout = max(timeout - 90, 300)  # At least 5 minutes for build
         return self.wait_for_completion(
             application_id,
             deployment_id,
-            timeout=timeout
+            timeout=remaining_timeout
         )
