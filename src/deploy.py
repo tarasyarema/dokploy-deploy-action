@@ -11,9 +11,9 @@ import sys
 import time
 from typing import Optional
 
-from logger import create_logger
-from dokploy_client import DokployClient, DokployAPIError
-from deployment_tracker import (
+from .logger import create_logger
+from .dokploy_client import DokployClient, DokployAPIError
+from .deployment_tracker import (
     DeploymentTracker,
     DeploymentNotFoundError,
     DeploymentFailedError,

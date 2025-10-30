@@ -7,10 +7,10 @@ import argparse
 from pathlib import Path
 from typing import List, Optional
 
-from src.config import DokployConfig, ConfigError, load_config
-from src.logger import DeployLogger
-from src.dokploy_client import DokployClient, DokployAPIError
-from src.deployment_tracker import (
+from .config import DokployConfig, ConfigError, load_config
+from .logger import DeployLogger
+from .dokploy_client import DokployClient, DokployAPIError
+from .deployment_tracker import (
     DeploymentTracker,
     DeploymentNotFoundError,
     DeploymentFailedError,

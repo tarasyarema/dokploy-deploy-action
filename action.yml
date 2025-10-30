@@ -49,6 +49,7 @@ runs:
 
     - name: Run Dokploy deployment
       shell: bash
+      working-directory: ${{ github.action_path }}
       env:
         INPUT_DOKPLOY_URL: ${{ inputs.dokploy_url }}
         INPUT_AUTH_TOKEN: ${{ inputs.auth_token }}
@@ -58,6 +59,5 @@ runs:
         INPUT_RESTART: ${{ inputs.restart || 'false' }}
         INPUT_SKIP_DEPLOY: ${{ inputs.skip_deploy || 'false' }}
         INPUT_DEBUG: ${{ inputs.debug || 'false' }}
-        PYTHONPATH: ${{ github.action_path }}/src
       run: |
-        python3 ${{ github.action_path }}/src/deploy.py
+        python3 -m src.deploy

@@ -6,8 +6,8 @@ Handles the critical logic of finding the triggered deployment and tracking it t
 import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
-from src.dokploy_client import DokployClient, DokployAPIError
-from src.logger import DeployLogger
+from .dokploy_client import DokployClient, DokployAPIError
+from .logger import DeployLogger
 
 
 class DeploymentNotFoundError(Exception):

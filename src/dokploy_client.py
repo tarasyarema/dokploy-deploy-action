@@ -4,7 +4,7 @@ Dokploy API client for triggering and monitoring deployments.
 
 import requests
 from typing import Dict, List, Optional, Any
-from src.logger import DeployLogger
+from .logger import DeployLogger
 
 
 class DokployAPIError(Exception):
