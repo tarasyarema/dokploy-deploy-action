@@ -92,7 +92,7 @@ class DeploymentTracker:
         self,
         application_id: str,
         baseline_timestamp: Optional[str],
-        timeout: int = 90
+        timeout: int = 240
     ) -> Dict[str, Any]:
         """
         Wait for a new deployment to appear after triggering.
@@ -117,6 +117,8 @@ class DeploymentTracker:
         start_time = time.time()
         poll_interval = 3  # Start with 3 second polls
         last_check_time = 0
+
+        deployments: List[Dict[str, Any]] = []
 
         while time.time() - start_time < timeout:
             elapsed = int(time.time() - start_time)
