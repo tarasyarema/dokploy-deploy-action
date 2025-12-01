@@ -204,7 +204,6 @@ def deploy_app(
                 final_deployment = tracker.track_deployment(
                     application_id=app.id,
                     baseline_timestamp=baseline_timestamp,
-                    timeout=600
                 )
 
                 deployment_id = final_deployment['deploymentId']

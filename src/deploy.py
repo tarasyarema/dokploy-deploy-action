@@ -102,7 +102,7 @@ def main() -> int:
                 final_deployment = tracker.track_deployment(
                     application_id=application_id,
                     baseline_timestamp=baseline_timestamp,
-                    timeout=600  # 10 minutes default for builds
+                    # timeout=600  # 10 minutes default for builds
                 )
 
                 deployment_id = final_deployment['deploymentId']

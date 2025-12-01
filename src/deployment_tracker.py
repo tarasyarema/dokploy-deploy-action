@@ -325,17 +325,20 @@ class DeploymentTracker:
             DeploymentFailedError: If deployment fails
             DeploymentTimeoutError: If deployment times out
         """
+        to = 240
+
         # Phase 1: Wait for deployment to be created (max 90s for queued deployments)
         new_deployment = self.wait_for_new_deployment(
             application_id,
             baseline_timestamp,
-            timeout=90
+            timeout=to,
         )
 
         deployment_id = new_deployment['deploymentId']
 
         # Phase 2: Wait for completion (remaining timeout)
-        remaining_timeout = max(timeout - 90, 300)  # At least 5 minutes for build
+        remaining_timeout = max(timeout - to, 300)  # At least 5 minutes for build
+
         return self.wait_for_completion(
             application_id,
             deployment_id,
