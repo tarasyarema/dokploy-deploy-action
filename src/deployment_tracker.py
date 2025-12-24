@@ -90,7 +90,8 @@ class DeploymentTracker:
 
     def wait_for_new_deployment(
         self,
-        application_id: str,
+        service_id: str,
+        deployment_type: str,
         baseline_timestamp: Optional[str],
         timeout: int = 240
     ) -> Dict[str, Any]:
@@ -101,9 +102,10 @@ class DeploymentTracker:
         the deployment has been created in the system.
 
         Args:
-            application_id: Application ID
+            service_id: Application ID or Compose ID
+            deployment_type: "application" or "compose"
             baseline_timestamp: Timestamp of latest deployment before trigger
-            timeout: Max seconds to wait for deployment to appear (default 90s)
+            timeout: Max seconds to wait for deployment to appear (default 240s)
 
         Returns:
             The new deployment object
@@ -123,7 +125,11 @@ class DeploymentTracker:
         while time.time() - start_time < timeout:
             elapsed = int(time.time() - start_time)
 
-            deployments = self.client.get_deployments(application_id)
+            # Get deployments based on type
+            if deployment_type == 'application':
+                deployments = self.client.get_deployments(service_id)
+            elif deployment_type == 'compose':
+                deployments = self.client.get_compose_deployments(service_id)
 
             # Debug: show latest deployment on first check and every 15s
             if elapsed - last_check_time >= 15 or last_check_time == 0:
@@ -175,7 +181,8 @@ class DeploymentTracker:
 
     def wait_for_completion(
         self,
-        application_id: str,
+        service_id: str,
+        deployment_type: str,
         deployment_id: str,
         timeout: int = 600
     ) -> Dict[str, Any]:
@@ -189,7 +196,8 @@ class DeploymentTracker:
         - Timeout
 
         Args:
-            application_id: Application ID
+            service_id: Application ID or Compose ID
+            deployment_type: "application" or "compose"
             deployment_id: Specific deployment ID to track
             timeout: Max seconds to wait (default 10 minutes for builds)
 
@@ -231,8 +239,11 @@ class DeploymentTracker:
                     f"Last status: {last_status}"
                 )
 
-            # Get all deployments and find ours
-            deployments = self.client.get_deployments(application_id)
+            # Get all deployments and find ours (use correct method for type)
+            if deployment_type == 'application':
+                deployments = self.client.get_deployments(service_id)
+            elif deployment_type == 'compose':
+                deployments = self.client.get_compose_deployments(service_id)
             deployment = next(
                 (d for d in deployments if d['deploymentId'] == deployment_id),
                 None
@@ -301,7 +312,8 @@ class DeploymentTracker:
 
     def track_deployment(
         self,
-        application_id: str,
+        service_id: str,
+        deployment_type: str,
         baseline_timestamp: Optional[str],
         timeout: int = 600
     ) -> Dict[str, Any]:
@@ -309,11 +321,12 @@ class DeploymentTracker:
         Complete deployment tracking: wait for creation, then wait for completion.
 
         This is the main entry point that combines both phases of tracking:
-        1. Wait for the new deployment to appear in the API (up to 90s)
+        1. Wait for the new deployment to appear in the API (up to 240s)
         2. Track that deployment to completion (remaining timeout)
 
         Args:
-            application_id: Application ID
+            service_id: Application ID or Compose ID
+            deployment_type: "application" or "compose"
             baseline_timestamp: Timestamp of latest deployment before trigger
             timeout: Total timeout in seconds (default 10 minutes)
 
@@ -327,9 +340,10 @@ class DeploymentTracker:
         """
         to = 240
 
-        # Phase 1: Wait for deployment to be created (max 90s for queued deployments)
+        # Phase 1: Wait for deployment to be created (max 240s for queued deployments)
         new_deployment = self.wait_for_new_deployment(
-            application_id,
+            service_id,
+            deployment_type,
             baseline_timestamp,
             timeout=to,
         )
@@ -340,7 +354,8 @@ class DeploymentTracker:
         remaining_timeout = max(timeout - to, 300)  # At least 5 minutes for build
 
         return self.wait_for_completion(
-            application_id,
+            service_id,
+            deployment_type,
             deployment_id,
             timeout=remaining_timeout
         )

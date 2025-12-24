@@ -1,10 +1,11 @@
 # Dokploy Deployment Tool
 
-Deploy applications to Dokploy from **GitHub Actions** or the **command line**.
+Deploy **applications** and **Docker Compose services** to Dokploy from **GitHub Actions** or the **command line**.
 
 This tool:
 - 🎯 **GitHub Action** - Automated deployments in your CI/CD pipeline
 - 💻 **CLI Tool (`dokdeploy`)** - Deploy from your local machine
+- 📦 **Application & Compose Support** - Deploy both application and Docker Compose services
 - ✅ **Proper verification** - Ensures deployments actually complete (no more race conditions!)
 
 ## What's New (v2.0)
@@ -37,6 +38,22 @@ Example: `https://server.example.com` or `https://app.dokploy.com`
 
 **Required** The Dokploy application name.
 
+### `deployment_type`
+
+**Optional** The type of deployment: `application` or `compose`. Default: `application`.
+
+When deploying a Docker Compose service, set this to `compose` and provide `compose_id` and `compose_name` instead of `application_id` and `application_name`.
+
+### `compose_id`
+
+**Optional** The Dokploy compose service ID. Required when `deployment_type` is `compose`.
+
+### `compose_name`
+
+**Optional** The Dokploy compose service name. Required when `deployment_type` is `compose`.
+
+**Note**: For application deployments (the default), use `application_id` and `application_name` instead.
+
 ### `wait_for_completion`
 
 **Optional** Wait for the deployment to finish before completing the action. Default: `false`.
@@ -65,6 +82,22 @@ When `true`:
 **Optional** Enable debug logging to see full API requests and responses. Default: `false`.
 
 Useful for troubleshooting deployment issues.
+
+## All Available Inputs
+
+| Input | Required | Default | Description |
+|-------|----------|---------|-------------|
+| `dokploy_url` | Yes | - | Dokploy dashboard URL |
+| `auth_token` | Yes | - | Dokploy authentication token |
+| `deployment_type` | No | `application` | Deployment type: `application` or `compose` |
+| `application_id` | Conditional | - | Application ID (required for application deployments) |
+| `application_name` | Conditional | - | Application name (required for application deployments) |
+| `compose_id` | Conditional | - | Compose ID (required for compose deployments) |
+| `compose_name` | Conditional | - | Compose name (required for compose deployments) |
+| `wait_for_completion` | No | `false` | Wait for deployment to finish |
+| `restart` | No | `false` | Restart after deployment |
+| `debug` | No | `false` | Enable debug logging |
+| `skip_deploy` | No | `false` | Skip deployment trigger (testing) |
 
 ## Usage
 
@@ -128,6 +161,72 @@ For apps that need explicit restart:
           application_name: my-app
           wait_for_completion: true
           restart: true
+```
+
+### Compose Service Deployment
+
+Deploy a Docker Compose service:
+
+```yaml
+name: Deploy Compose to Dokploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy Compose service
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          deployment_type: compose
+          compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+          compose_name: my-compose-stack
+          wait_for_completion: true
+```
+
+### Compose Service with Restart
+
+```yaml
+      - name: Deploy and restart compose
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          deployment_type: compose
+          compose_id: ${{ secrets.DOKPLOY_COMPOSE_ID }}
+          compose_name: my-compose-stack
+          wait_for_completion: true
+          restart: true
+```
+
+### Multiple Compose Services (Matrix)
+
+Deploy multiple compose services in parallel:
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compose:
+          - { id: 'abc123', name: 'backend-stack' }
+          - { id: 'def456', name: 'frontend-stack' }
+    steps:
+      - name: Deploy ${{ matrix.compose.name }}
+        uses: tarasyarema/dokploy-deploy-action@main
+        with:
+          dokploy_url: ${{ secrets.DOKPLOY_URL }}
+          auth_token: ${{ secrets.DOKPLOY_TOKEN }}
+          deployment_type: compose
+          compose_id: ${{ matrix.compose.id }}
+          compose_name: ${{ matrix.compose.name }}
+          wait_for_completion: true
 ```
 
 ### Multiple Applications (Matrix Strategy)
@@ -200,15 +299,19 @@ Enable detailed logging to troubleshoot issues:
 
 ## How It Works
 
-The action fixes the race condition bug by:
+The action fixes the race condition bug for both application and compose deployments by:
 
 1. **Capturing baseline**: Gets the timestamp of the latest deployment before triggering
-2. **Triggering deployment**: Calls Dokploy API to start deployment
-3. **Finding the new deployment**: Polls `/api/deployment.all` for a deployment created after baseline
+2. **Triggering deployment**: Calls appropriate Dokploy API (`/api/application.deploy` or `/api/compose.deploy`)
+3. **Finding the new deployment**: Polls deployment list for a deployment created after baseline
 4. **Tracking by ID**: Monitors that specific deployment's status until completion
 5. **Verifying completion**: Ensures deployment actually entered "running" state before "done"
 
-This prevents the bug where the action would check `applicationStatus` (already "done" from previous deployment) instead of tracking the triggered deployment.
+This prevents the bug where the action would check service status (already "done" from previous deployment) instead of tracking the triggered deployment.
+
+**Supported Deployment Types:**
+- **Application deployments**: Traditional Dokploy application deployments
+- **Compose deployments**: Docker Compose stack deployments
 
 ## Troubleshooting
 
