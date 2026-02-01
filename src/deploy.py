@@ -151,10 +151,11 @@ def main() -> int:
 
             except DeploymentFailedError as e:
                 logger.error(str(e))
-                if 'errorMessage' in final_deployment:
-                    logger.error(f"Error details: {final_deployment['errorMessage']}")
-                if 'logPath' in final_deployment:
-                    logger.info(f"Check logs at: {final_deployment['logPath']}")
+                if e.deployment:
+                    if e.deployment.get('errorMessage'):
+                        logger.error(f"Error details: {e.deployment['errorMessage']}")
+                    if e.deployment.get('logPath'):
+                        logger.info(f"Check logs at: {e.deployment['logPath']}")
                 return 1
 
             except DeploymentTimeoutError as e:

@@ -17,7 +17,10 @@ class DeploymentNotFoundError(Exception):
 
 class DeploymentFailedError(Exception):
     """Raised when deployment fails."""
-    pass
+
+    def __init__(self, message: str, deployment: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.deployment = deployment
 
 
 class DeploymentTimeoutError(Exception):
@@ -287,12 +290,14 @@ class DeploymentTracker:
             elif status == 'error':
                 error_detail = f": {error_message}" if error_message else ""
                 raise DeploymentFailedError(
-                    f"Deployment {deployment_id} failed{error_detail}"
+                    f"Deployment {deployment_id} failed{error_detail}",
+                    deployment=deployment
                 )
 
             elif status == 'cancelled':
                 raise DeploymentFailedError(
-                    f"Deployment {deployment_id} was cancelled"
+                    f"Deployment {deployment_id} was cancelled",
+                    deployment=deployment
                 )
 
             # Check for stuck states
