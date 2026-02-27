@@ -61,7 +61,7 @@ class DokployClient:
         Trigger deployment for an application.
 
         Note: This endpoint returns 200 OK but no deployment ID in the response body.
-        You must poll deployment.all to find the newly created deployment.
+        You must poll deployment/all to find the newly created deployment.
 
         Args:
             application_id: The Dokploy application ID
@@ -73,7 +73,7 @@ class DokployClient:
 
         self._make_request(
             'POST',
-            '/api/application.deploy',
+            '/api/application/deploy',
             json={'applicationId': application_id}
         )
 
@@ -126,7 +126,7 @@ class DokployClient:
 
         response = self._make_request(
             'GET',
-            f'/api/deployment.all?applicationId={application_id}'
+            f'/api/deployment/all?applicationId={application_id}'
         )
 
         deployments = response.json()
@@ -178,7 +178,7 @@ class DokployClient:
 
         response = self._make_request(
             'GET',
-            f'/api/application.one?applicationId={application_id}'
+            f'/api/application/one?applicationId={application_id}'
         )
 
         return response.json()
@@ -222,7 +222,7 @@ class DokployClient:
 
         self._make_request(
             'POST',
-            '/api/application.reload',
+            '/api/application/reload',
             json={
                 'applicationId': application_id,
                 'appName': app_name
@@ -245,7 +245,7 @@ class DokployClient:
 
         self._make_request(
             'POST',
-            '/api/application.stop',
+            '/api/application/stop',
             json={'applicationId': application_id}
         )
 
@@ -265,7 +265,7 @@ class DokployClient:
 
         self._make_request(
             'POST',
-            '/api/application.start',
+            '/api/application/start',
             json={'applicationId': application_id}
         )
 
