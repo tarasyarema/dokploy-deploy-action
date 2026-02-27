@@ -204,7 +204,7 @@ The action fixes the race condition bug by:
 
 1. **Capturing baseline**: Gets the timestamp of the latest deployment before triggering
 2. **Triggering deployment**: Calls Dokploy API to start deployment
-3. **Finding the new deployment**: Polls `/api/deployment.all` for a deployment created after baseline
+3. **Finding the new deployment**: Polls `/api/deployment/all` for a deployment created after baseline
 4. **Tracking by ID**: Monitors that specific deployment's status until completion
 5. **Verifying completion**: Ensures deployment actually entered "running" state before "done"
 

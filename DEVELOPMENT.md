@@ -503,17 +503,17 @@ This shows:
 ```bash
 # Test authentication
 curl -X GET \
-  "https://app.dokploy.com/api/application.one?applicationId=YOUR_APP_ID" \
+  "https://app.dokploy.com/api/application/one?applicationId=YOUR_APP_ID" \
   -H "x-api-key: YOUR_API_TOKEN"
 
 # Test getting deployments
 curl -X GET \
-  "https://app.dokploy.com/api/deployment.all?applicationId=YOUR_APP_ID" \
+  "https://app.dokploy.com/api/deployment/all?applicationId=YOUR_APP_ID" \
   -H "x-api-key: YOUR_API_TOKEN"
 
 # Trigger deployment
 curl -X POST \
-  "https://app.dokploy.com/api/application.deploy" \
+  "https://app.dokploy.com/api/application/deploy" \
   -H "x-api-key: YOUR_API_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"applicationId": "YOUR_APP_ID"}'
