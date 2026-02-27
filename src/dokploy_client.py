@@ -79,6 +79,29 @@ class DokployClient:
 
         self.logger.info("Deployment triggered successfully")
 
+    def deploy_compose(self, compose_id: str) -> None:
+        """
+        Trigger deployment for a compose service.
+
+        Note: This endpoint returns 200 OK but no deployment ID in the response body.
+        You must poll deployment.allByCompose to find the newly created deployment.
+
+        Args:
+            compose_id: The Dokploy compose ID
+
+        Raises:
+            DokployAPIError: If the API request fails
+        """
+        self.logger.info(f"Triggering deployment for compose: {compose_id}")
+
+        self._make_request(
+            'POST',
+            '/api/compose.deploy',
+            json={'composeId': compose_id}
+        )
+
+        self.logger.info("Compose deployment triggered successfully")
+
     def get_deployments(self, application_id: str) -> List[Dict[str, Any]]:
         """
         Get all deployments for an application, sorted by creation time (newest first).
@@ -111,6 +134,31 @@ class DokployClient:
 
         return deployments
 
+    def get_compose_deployments(self, compose_id: str) -> List[Dict[str, Any]]:
+        """
+        Get all deployments for a compose service, sorted by creation time (newest first).
+
+        Args:
+            compose_id: The Dokploy compose ID
+
+        Returns:
+            List of deployment objects with same structure as application deployments
+
+        Raises:
+            DokployAPIError: If the API request fails
+        """
+        self.logger.debug(f"Fetching deployments for compose: {compose_id}")
+
+        response = self._make_request(
+            'GET',
+            f'/api/deployment.allByCompose?composeId={compose_id}'
+        )
+
+        deployments = response.json()
+        self.logger.debug(f"Found {len(deployments)} compose deployments")
+
+        return deployments
+
     def get_application(self, application_id: str) -> Dict[str, Any]:
         """
         Get application details.
@@ -131,6 +179,30 @@ class DokployClient:
         response = self._make_request(
             'GET',
             f'/api/application/one?applicationId={application_id}'
+        )
+
+        return response.json()
+
+    def get_compose(self, compose_id: str) -> Dict[str, Any]:
+        """
+        Get compose service details.
+
+        Args:
+            compose_id: The Dokploy compose ID
+
+        Returns:
+            Compose object with fields like:
+            - composeStatus: Overall compose status
+            - deployments: Array of recent deployments
+
+        Raises:
+            DokployAPIError: If the API request fails
+        """
+        self.logger.debug(f"Fetching compose details: {compose_id}")
+
+        response = self._make_request(
+            'GET',
+            f'/api/compose.one?composeId={compose_id}'
         )
 
         return response.json()
@@ -198,3 +270,43 @@ class DokployClient:
         )
 
         self.logger.info("Application started successfully")
+
+    def stop_compose(self, compose_id: str) -> None:
+        """
+        Stop a compose service.
+
+        Args:
+            compose_id: The Dokploy compose ID
+
+        Raises:
+            DokployAPIError: If the API request fails
+        """
+        self.logger.info(f"Stopping compose: {compose_id}")
+
+        self._make_request(
+            'POST',
+            '/api/compose.stop',
+            json={'composeId': compose_id}
+        )
+
+        self.logger.info("Compose stopped successfully")
+
+    def start_compose(self, compose_id: str) -> None:
+        """
+        Start a compose service.
+
+        Args:
+            compose_id: The Dokploy compose ID
+
+        Raises:
+            DokployAPIError: If the API request fails
+        """
+        self.logger.info(f"Starting compose: {compose_id}")
+
+        self._make_request(
+            'POST',
+            '/api/compose.start',
+            json={'composeId': compose_id}
+        )
+
+        self.logger.info("Compose started successfully")
